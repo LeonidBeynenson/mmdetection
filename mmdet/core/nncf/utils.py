@@ -26,14 +26,26 @@ if is_nncf_enabled():
     try:
         from nncf.initialization import InitializingDataLoader
         from nncf.structures import QuantizationRangeInitArgs
+        from nncf.compression_method_api import CompressionAlgorithmController
 
         from nncf import NNCFConfig
         from nncf import load_state
         from nncf import create_compressed_model, register_default_init_args
         from nncf.utils import get_all_modules
         from nncf.dynamic_graph.context import no_nncf_trace as original_no_nncf_trace
+
+        class_CompressionAlgorithmController = CompressionAlgorithmController
+        class_InitializingDataLoader = InitializingDataLoader
     except:
         raise RuntimeError("Incompatible version of NNCF")
+else:
+    class DummyCompressionAlgorithmController:
+        pass
+    class DummyInitializingDataLoader:
+        pass
+
+    class_CompressionAlgorithmController = DummyCompressionAlgorithmController
+    class_InitializingDataLoader = DummyInitializingDataLoader
 
 
 def wrap_nncf_model(model, cfg, data_loader_for_init=None):
@@ -67,6 +79,7 @@ def wrap_nncf_model(model, cfg, data_loader_for_init=None):
 
     compression_ctrl, model = create_compressed_model(model, nncf_config, dummy_forward_fn=dummy_forward,
                                                       resuming_state_dict=resuming_state_dict)
+    compression_ctrl = MMDetectionCompressionAlgorithmController(compression_ctrl, nncf_config)
     print(*get_all_modules(model).keys(), sep="\n")
     return compression_ctrl, model
 
@@ -96,16 +109,50 @@ def load_checkpoint(model, filename, map_location=None, strict=False):
     return checkpoint
 
 
-def export_model_to_onnx(compression_ctrl, nncf_config, f_name):
+def export_model_to_onnx(compression_ctrl, f_name):
     check_nncf_is_enabled()
-    input_size = nncf_config.get("input_info").get('sample_size')
-    device = "cpu"
-    input_args = ([torch.randn(input_size).to(device), ],)
-    input_kwargs = dict(return_loss=False, dummy_forward=True)
-    compression_ctrl.export_model(f_name, *input_args, **input_kwargs)
+    compression_ctrl.export_model(f_name)
 
 
-class MMInitializeDataLoader(InitializingDataLoader):
+class MMDetectionCompressionAlgorithmController(class_CompressionAlgorithmController):
+    def __init__(self, inner_ctrl, nncf_config):
+        self.inner_ctrl = inner_ctrl
+        self.nncf_config = nncf_config
+
+    @property
+    def loss(self):
+        return self.inner_ctrl.loss
+
+    @property
+    def scheduler(self):
+        return self.inner_ctrl.scheduler
+
+    def distributed(self):
+        return self.inner_ctrl.distributed()
+
+    def compression_level(self):
+        return self.inner_ctrl.compression_level()
+
+    def statistics(self):
+        return self.inner_ctrl.statistics()
+
+    def run_batchnorm_adaptation(self, config):
+        self.inner_ctrl.run_batchnorm_adaptation(config)
+
+    def export_model(self, filename, *args, **kwargs):
+        logger = get_root_logger()
+        if args:
+            logger.warn(f"ATTENTION: ignore args = {args}")
+        if kwargs:
+            logger.warn(f"ATTENTION: ignore kwargs = {kwargs}")
+
+        input_size = self.nncf_config.get("input_info").get('sample_size')
+        device = "cpu"
+        input_args = ([torch.randn(input_size).to(device), ],)
+        input_kwargs = dict(return_loss=False, dummy_forward=True)
+        self.inner_ctrl.export_model(filename, *input_args, **input_kwargs)
+
+class MMInitializeDataLoader(class_InitializingDataLoader):
     def get_inputs(self, dataloader_output):
         # redefined InitializingDataLoader because
         # of DataContainer format in mmdet

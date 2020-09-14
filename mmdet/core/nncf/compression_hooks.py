@@ -7,7 +7,8 @@ class CompressionHook(Hook):
         from nncf import NNCFConfig
 
         self.compression_ctrl = compression_ctrl
-        self.nncf_config = NNCFConfig(cfg.nncf_config)
+        # TODO: is it required now?
+        # self.nncf_config = NNCFConfig(cfg.nncf_config)
         self.work_dir = cfg.work_dir
 
     def after_train_iter(self, runner):
@@ -27,7 +28,7 @@ class CompressionHook(Hook):
             runner.logger.info("Exporting the model to ONXX format")
             f_name = str(self.work_dir) + "/compressed_model_" + str(
                 self.compression_ctrl.scheduler.last_epoch + 1) + ".onnx"
-            export_model_to_onnx(self.compression_ctrl, self.nncf_config, f_name)
+            export_model_to_onnx(self.compression_ctrl, f_name)
 
 
 def print_statistics(stats, logger):

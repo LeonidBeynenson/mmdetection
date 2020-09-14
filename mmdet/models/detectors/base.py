@@ -114,6 +114,9 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 augs (multiscale, flip, etc.) and the inner list indicates
                 images in a batch.
         """
+#        if 'dummy_forward' in kwargs:
+#            return self.forward_export(imgs)
+
         if 'dummy_forward' in kwargs:
             return self.forward_dummy(imgs[0])
 
