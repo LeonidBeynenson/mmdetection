@@ -18,22 +18,19 @@ import sys
 from subprocess import run, CalledProcessError, DEVNULL
 
 import mmcv
-import numpy as np
 import onnx
 import torch
 from onnx.optimizer import optimize
 from torch.onnx.symbolic_helper import _onnx_stable_opsets as available_opsets
 
-from mmcv.parallel import collate, scatter
 from mmdet.apis import init_detector
-from mmdet.apis.inference import LoadImage
-from mmdet.datasets.pipelines import Compose
 from mmdet.models import detectors
 from mmdet.models.dense_heads.anchor_head import AnchorHead
 from mmdet.models.roi_heads import SingleRoIExtractor
 from mmdet.utils.deployment.ssd_export_helpers import *
 from mmdet.utils.deployment.symbolic import register_extra_symbolics
 from mmdet.utils.deployment.tracer_stubs import AnchorsGridGeneratorStub, ROIFeatureExtractorStub
+from mmdet.apis import get_fake_input
 
 
 def export_to_onnx(model,
@@ -198,16 +195,6 @@ def stub_roi_feature_extractor(model, extractor_name):
             for i in range(len(extractor)):
                 if isinstance(extractor[i], SingleRoIExtractor):
                     extractor[i] = ROIFeatureExtractorStub(extractor[i])
-
-
-def get_fake_input(cfg, orig_img_shape=(128, 128, 3), device='cuda'):
-    test_pipeline = [LoadImage()] + cfg.data.test.pipeline[1:]
-    test_pipeline = Compose(test_pipeline)
-    data = dict(img=np.zeros(orig_img_shape, dtype=np.uint8))
-    data = test_pipeline(data)
-    data = scatter(collate([data], samples_per_gpu=1), [device])[0]
-    return data
-
 
 def optimize_onnx_graph(onnx_model_path):
     onnx_model = onnx.load(onnx_model_path)

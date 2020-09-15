@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 import mmcv
 import numpy as np
+from contextlib import contextmanager
 
 import pycocotools.mask as maskUtils
 import torch
@@ -23,6 +24,8 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
     def __init__(self):
         super(BaseDetector, self).__init__()
         self.fp16_enabled = False
+        self.img_metas = None
+        self.forward_backup = None
 
     @property
     def with_neck(self):
@@ -114,10 +117,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 augs (multiscale, flip, etc.) and the inner list indicates
                 images in a batch.
         """
-#        if 'dummy_forward' in kwargs:
-#            return self.forward_export(imgs)
-
-        if 'dummy_forward' in kwargs:
+        if kwargs.get("dummy_forward"):
             return self.forward_dummy(imgs[0])
 
         for var, name in [(imgs, 'imgs'), (img_metas, 'img_metas')]:
@@ -169,18 +169,29 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
 
     def forward_export(self, imgs):
         from torch.onnx.operators import shape_as_tensor
+        assert self.img_metas
+
         img_shape = shape_as_tensor(imgs[0])
         imgs_per_gpu = int(imgs[0].size(0))
         assert imgs_per_gpu == 1
+        assert len(self.img_metas[0]) == imgs_per_gpu, f"self.img_metas={self.img_metas}"
         self.img_metas[0][0]['img_shape'] = img_shape[2:4]
+
         return self.simple_test(imgs[0], self.img_metas[0], postprocess=False)
 
-    def export(self, img, img_metas, export_name='', **kwargs):
+    @contextmanager
+    def forward_export_context(self, img_metas):
         self.img_metas = img_metas
         self.forward_backup = self.forward
         self.forward = self.forward_export
-        torch.onnx.export(self, img, export_name, **kwargs)
+        yield
         self.forward = self.forward_backup
+        self.forward_backup = None
+        self.img_metas = None
+
+    def export(self, img, img_metas, export_name='', **kwargs):
+        with self.forward_export_context(img_metas):
+            torch.onnx.export(self, img, export_name, **kwargs)
 
     def _parse_losses(self, losses):
         """Parse the raw outputs (losses) of the network.

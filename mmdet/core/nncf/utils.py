@@ -48,7 +48,13 @@ else:
     class_InitializingDataLoader = DummyInitializingDataLoader
 
 
-def wrap_nncf_model(model, cfg, data_loader_for_init=None):
+SHOULD_USE_DUMMY_FORWARD_WITH_EXPORT_PART = False
+def wrap_nncf_model(model, cfg, data_loader_for_init=None, get_fake_input_func=None):
+    """
+    The function wraps mmdet model by NNCF
+    Note that the parameter `get_fake_input_func` should be the function `get_fake_input`
+    -- cannot import this function here explicitly
+    """
     check_nncf_is_enabled()
     pathlib.Path(cfg.work_dir).mkdir(parents=True, exist_ok=True)
     nncf_config = NNCFConfig(cfg.nncf_config)
@@ -68,12 +74,48 @@ def wrap_nncf_model(model, cfg, data_loader_for_init=None):
     else:
         resuming_state_dict = None
 
-    def dummy_forward(model):
+    def _get_fake_data_for_forward_export(cfg, nncf_config, get_fake_input_func):
+        # based on the method `export` of BaseDetector from mmdet/models/detectors/base.py
+        # and on the script tools/export.py
+        assert get_fake_input_func is not None
+
+        input_size = nncf_config.get("input_info").get('sample_size')
+        assert len(input_size) == 4 and input_size[0] == 1
+
+        H, W = input_size[-2:]
+        C = input_size[1]
+        orig_img_shape = tuple(H, W, C) #HWC order here for np.zeros to emulate cv2.imread
+
+        device = next(model.parameters()).device
+
+        # NB: the full cfg is required here!
+        fake_data = get_fake_input_func(cfg, orig_img_shape=orig_img_shape, device=device)
+        return fake_data
+
+    if SHOULD_USE_DUMMY_FORWARD_WITH_EXPORT_PART:
+        fake_data = _get_fake_data_for_forward_export(cfg, nncf_config, get_fake_input_func)
+    else:
+        fake_data = None # won't be used anyway
+
+    def dummy_forward_without_export_part(model):
         input_size = nncf_config.get("input_info").get('sample_size')
         device = next(model.parameters()).device
         input_args = ([torch.randn(input_size).to(device), ],)
         input_kwargs = dict(return_loss=False, dummy_forward=True)
         model(*input_args, **input_kwargs)
+
+    def dummy_forward_with_export_part(model):
+        # based on the method `export` of BaseDetector from mmdet/models/detectors/base.py
+        # and on the script tools/export.py
+        img = fake_data["img"]
+        img_metas = fake_data["img_metas"]
+        with model.forward_export_context(img_metas):
+            model(img)
+
+    if SHOULD_USE_DUMMY_FORWARD_WITH_EXPORT_PART:
+        dummy_forward = dummy_forward_with_export_part
+    else:
+        dummy_forward = dummy_forward_without_export_part
 
     model.dummy_forward_fn = dummy_forward
 
@@ -118,6 +160,20 @@ class MMDetectionCompressionAlgorithmController(class_CompressionAlgorithmContro
     def __init__(self, inner_ctrl, nncf_config):
         self.inner_ctrl = inner_ctrl
         self.nncf_config = nncf_config
+#        it = iter(data_loader_for_init)
+#        el = next(it)
+#        print("")
+#        print("el=")
+#        print(el)
+#        print("")
+#        print("el['img_metas']=")
+#        from pprint import pprint
+#        pprint(el['img_metas'], indent=4)
+#        print("")
+#        print("repr(el['img_metas'])=")
+#        print(repr(el["img_metas"]))
+#
+#        assert False
 
     @property
     def loss(self):
