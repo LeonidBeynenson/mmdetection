@@ -48,6 +48,10 @@ else:
     class_CompressionAlgorithmController = DummyCompressionAlgorithmController
     class_InitializingDataLoader = DummyInitializingDataLoader
 
+def check_NNCFNetwork_is_compatible():
+    check_nncf_is_enabled()
+    from nncf.nncf_network import NNCFNetwork
+    assert not hasattr(NNCFNetwork, "export"), "NNCFNetwork should not contain 'export', since it is defined in BaseDetector"
 
 SHOULD_USE_DUMMY_FORWARD_WITH_EXPORT_PART = True
 def wrap_nncf_model(model, cfg, data_loader_for_init=None, get_fake_input_func=None):
@@ -57,6 +61,7 @@ def wrap_nncf_model(model, cfg, data_loader_for_init=None, get_fake_input_func=N
     -- cannot import this function here explicitly
     """
     check_nncf_is_enabled()
+    check_NNCFNetwork_is_compatible()
     pathlib.Path(cfg.work_dir).mkdir(parents=True, exist_ok=True)
     nncf_config = NNCFConfig(cfg.nncf_config)
     logger = get_root_logger(cfg.log_level)
