@@ -12,6 +12,7 @@ from mmdet.utils import get_root_logger
 from mmdet.parallel import MMDataCPU
 
 from mmdet.core.nncf import wrap_nncf_model
+from .fake_input import get_fake_input
 
 
 def set_random_seed(seed, deterministic=False):
@@ -89,7 +90,7 @@ def train_detector(model,
 
     # nncf model wrapper
     if cfg.ENABLE_COMPRESSION:
-        compression_ctrl, model = wrap_nncf_model(model, cfg, data_loaders[0])
+        compression_ctrl, model = wrap_nncf_model(model, cfg, data_loaders[0], get_fake_input)
     else:
         compression_ctrl = None
 
