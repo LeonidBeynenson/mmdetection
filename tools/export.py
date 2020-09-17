@@ -34,8 +34,7 @@ from mmdet.apis import get_fake_input
 
 from mmdet.core.nncf import wrap_nncf_model, check_nncf_is_enabled
 
-def export_to_onnx(cfg,
-                   model,
+def export_to_onnx(model,
                    data,
                    export_name,
                    verbose=False,
@@ -79,13 +78,6 @@ def export_to_onnx(cfg,
             if model.roi_head.with_mask:
                 output_names.append('masks')
                 dynamic_axes['masks'] = {0: 'objects_num'}
-
-        # BEGIN nncf part
-        if 'nncf_config' in cfg:
-            check_nncf_is_enabled()
-            compression_ctrl, model = wrap_nncf_model(model, cfg, None, get_fake_input)
-            compression_ctrl.prepare_for_export()
-        # END nncf part
 
         with torch.no_grad():
             model.export(
@@ -236,6 +228,13 @@ def main(args):
     cfg = model.cfg
     fake_data = get_fake_input(cfg, device=device)
 
+    # BEGIN nncf part
+    if 'nncf_config' in cfg:
+        check_nncf_is_enabled()
+        compression_ctrl, model = wrap_nncf_model(model, cfg, None, get_fake_input)
+        compression_ctrl.prepare_for_export()
+    # END nncf part
+
     if args.target == 'openvino' and not args.alt_ssd_export:
         stub_anchor_generator(model, 'rpn_head')
         stub_anchor_generator(model, 'bbox_head')
@@ -248,7 +247,7 @@ def main(args):
                                osp.splitext(osp.basename(args.config))[0] + '.onnx')
 
     with torch.no_grad():
-        export_to_onnx(cfg, model, fake_data, export_name=onnx_model_path, opset=args.opset,
+        export_to_onnx(model, fake_data, export_name=onnx_model_path, opset=args.opset,
                        alt_ssd_export=getattr(args, 'alt_ssd_export', False))
         add_node_names(onnx_model_path)
         print(f'ONNX model has been saved to "{onnx_model_path}"')
