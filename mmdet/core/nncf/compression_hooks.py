@@ -22,13 +22,7 @@ class CompressionHook(Hook):
             print_statistics(self.compression_ctrl.statistics(), runner.logger)
 
     def after_run(self, runner):
-        from .utils import export_model_to_onnx
-
-        if runner.rank == 0:
-            runner.logger.info("Exporting the model to ONXX format")
-            f_name = str(self.work_dir) + "/compressed_model_" + str(
-                self.compression_ctrl.scheduler.last_epoch + 1) + ".onnx"
-            export_model_to_onnx(self.compression_ctrl, f_name)
+        pass
 
 
 def print_statistics(stats, logger):

@@ -128,7 +128,6 @@ def wrap_nncf_model(model, cfg, data_loader_for_init=None, get_fake_input_func=N
 
     compression_ctrl, model = create_compressed_model(model, nncf_config, dummy_forward_fn=dummy_forward,
                                                       resuming_state_dict=resuming_state_dict)
-    compression_ctrl = MMDetectionCompressionAlgorithmController(compression_ctrl, nncf_config)
     print(*get_all_modules(model).keys(), sep="\n")
     return compression_ctrl, model
 
@@ -159,61 +158,10 @@ def load_checkpoint(model, filename, map_location=None, strict=False):
 
 
 def export_model_to_onnx(compression_ctrl, f_name):
-    check_nncf_is_enabled()
-    compression_ctrl.export_model(f_name)
-
-
-class MMDetectionCompressionAlgorithmController(class_CompressionAlgorithmController):
-    def __init__(self, inner_ctrl, nncf_config):
-        self.inner_ctrl = inner_ctrl
-        self.nncf_config = nncf_config
-#        it = iter(data_loader_for_init)
-#        el = next(it)
-#        print("")
-#        print("el=")
-#        print(el)
-#        print("")
-#        print("el['img_metas']=")
-#        from pprint import pprint
-#        pprint(el['img_metas'], indent=4)
-#        print("")
-#        print("repr(el['img_metas'])=")
-#        print(repr(el["img_metas"]))
-#
-#        assert False
-
-    @property
-    def loss(self):
-        return self.inner_ctrl.loss
-
-    @property
-    def scheduler(self):
-        return self.inner_ctrl.scheduler
-
-    def distributed(self):
-        return self.inner_ctrl.distributed()
-
-    def compression_level(self):
-        return self.inner_ctrl.compression_level()
-
-    def statistics(self):
-        return self.inner_ctrl.statistics()
-
-    def run_batchnorm_adaptation(self, config):
-        self.inner_ctrl.run_batchnorm_adaptation(config)
-
-    def export_model(self, filename, *args, **kwargs):
-        logger = get_root_logger()
-        if args:
-            logger.warn(f"ATTENTION: ignore args = {args}")
-        if kwargs:
-            logger.warn(f"ATTENTION: ignore kwargs = {kwargs}")
-
-        input_size = self.nncf_config.get("input_info").get('sample_size')
-        device = "cpu"
-        input_args = ([torch.randn(input_size).to(device), ],)
-        input_kwargs = dict(return_loss=False, dummy_forward=True)
-        self.inner_ctrl.export_model(filename, *input_args, **input_kwargs)
+    logger = get_root_logger(cfg.log_level)
+    logger.error("The function 'mmdet.core.nncf.export_model_to_onnx' is obsolete now "
+                 "-- please, use the script tools/export.py with the same config file and the corresponding snapshot")
+    logger.error("Now the function 'mmdet.core.nncf.export_model_to_onnx' does nothing and return")
 
 class MMInitializeDataLoader(class_InitializingDataLoader):
     def get_inputs(self, dataloader_output):
