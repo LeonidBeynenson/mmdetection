@@ -53,8 +53,8 @@ def check_NNCFNetwork_is_compatible():
     from nncf.nncf_network import NNCFNetwork
     assert not hasattr(NNCFNetwork, "export"), "NNCFNetwork should not contain 'export', since it is defined in BaseDetector"
 
-SHOULD_USE_DUMMY_FORWARD_WITH_EXPORT_PART = True
-def wrap_nncf_model(model, cfg, data_loader_for_init=None, get_fake_input_func=None):
+def wrap_nncf_model(model, cfg, data_loader_for_init=None, get_fake_input_func=None,
+                    should_use_dummy_forward_with_export_part=True):
     """
     The function wraps mmdet model by NNCF
     Note that the parameter `get_fake_input_func` should be the function `get_fake_input`
@@ -119,7 +119,7 @@ def wrap_nncf_model(model, cfg, data_loader_for_init=None, get_fake_input_func=N
         with model.forward_export_context(img_metas):
             model(img)
 
-    if SHOULD_USE_DUMMY_FORWARD_WITH_EXPORT_PART:
+    if should_use_dummy_forward_with_export_part:
         dummy_forward = dummy_forward_with_export_part
     else:
         dummy_forward = dummy_forward_without_export_part
