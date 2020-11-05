@@ -3,7 +3,7 @@ data = dict(
     samples_per_gpu=32,
 )
 # optimizer
-optimizer = dict(type='SGD', lr=0.005, momentum=0.9, weight_decay=0.0005)
+optimizer = dict(type='SGD', lr=0.0001, momentum=0.9, weight_decay=0.0005)
 # runtime settings
 total_epochs = 3
 log_level = 'INFO'
