@@ -1,5 +1,5 @@
-_base_ = ['../../../../openvino_training_extensions/pytorch_toolkit/object_detection/model_templates/face-detection/face-detection-0200/model.py']
-input_size = 256
+_base_ = ['../../../../openvino_training_extensions/pytorch_toolkit/object_detection/model_templates/face-detection/face-detection-0205/model.py']
+input_size = 416
 data = dict(
     samples_per_gpu=32,
 )
@@ -11,7 +11,7 @@ log_level = 'INFO'
 work_dir = './output'
 
 
-load_from = 'https://download.01.org/opencv/openvino_training_extensions/models/object_detection/v2/face-detection-0200.pth'
+load_from = 'https://download.01.org/opencv/openvino_training_extensions/models/object_detection/v2/face-detection-0205.pth'
 
 find_unused_parameters = True
 
